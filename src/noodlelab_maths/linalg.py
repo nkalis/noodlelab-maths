@@ -59,9 +59,18 @@ RadPerSecond = Quantity["rad/s"]
 # --- helpers ----------------------------------------------------------------------------------
 
 
-def _split(value: Any, name: str, *, square: bool = False, vector_ok: bool = True) -> Any:
-    """The numbers of a matrix input as float64, and its unit, with errors that
-    say what is wrong with the shape."""
+def _split(
+    value: Any,
+    name: str,
+    *,
+    square: bool = False,
+    vector_ok: bool = True,
+    complex_ok: bool = False,
+) -> Any:
+    """The numbers of a matrix input as float64 (complex128 with ``complex_ok``,
+    when they are complex), and its unit, with errors that say what is wrong
+    with the shape. Most of these nodes take real matrices only: casting would
+    keep only the real parts."""
     reg = ureg()
     if is_quantity(value):
         mag, unit = value.magnitude, value.units
@@ -73,9 +82,9 @@ def _split(value: Any, name: str, *, square: bool = False, vector_ok: bool = Tru
             f"{name} holds values with uncertainties: a matrix carries no uncertainty. "
             "Use a Monte Carlo zone to propagate them"
         )
-    if arr.dtype.kind == "c":
-        raise TypeError(f"{name} is complex: these nodes work on real matrices")
-    arr = arr.astype(np.float64)
+    if arr.dtype.kind == "c" and not complex_ok:
+        raise TypeError(f"{name} is complex: this node works on real matrices")
+    arr = arr.astype(np.complex128 if arr.dtype.kind == "c" else np.float64)
     if arr.ndim == 0:
         raise ValueError(f"{name} must be a matrix; got a single value ({arr.item():g})")
     if arr.ndim > 2:
@@ -103,15 +112,24 @@ def _join(mag: Any, unit: Any) -> Any:
 
 _ROWS = re.compile(r"[;\n]")
 _ENTRIES = re.compile(r"[,\s]+")
+# a complex entry as Python writes it, without spaces: 3+4j, -2.5e-3j, (1-2j)
+_COMPLEX_ENTRY = re.compile(r"\(?[-+]?[\d.eE+-]*j\)?")
 
 
-def _parse_matrix(text: str) -> NDArray[np.float64]:
+def _entry(token: str) -> float | complex:
+    if _COMPLEX_ENTRY.fullmatch(token):
+        return complex(token)
+    return float(token)
+
+
+def _parse_matrix(text: str) -> NDArray[np.float64] | NDArray[np.complex128]:
     """``"2, -1; -1, 2"`` (MATLAB style) as a 2-D array: rows end at ``;`` or a
-    new line, entries are separated by commas or spaces."""
+    new line, entries are separated by commas or spaces. Entries may be
+    complex (``3+4j``, no spaces inside); the matrix is then complex."""
     body = text.strip()
     if body.startswith("[") and body.endswith("]"):
         body = body[1:-1]
-    rows: list[list[float]] = []
+    rows: list[list[float | complex]] = []
     for line in _ROWS.split(body):
         tokens = [t for t in _ENTRIES.split(line.strip().strip("[]")) if t]
         if not tokens:
@@ -119,7 +137,7 @@ def _parse_matrix(text: str) -> NDArray[np.float64]:
         row = []
         for token in tokens:
             try:
-                row.append(float(token))
+                row.append(_entry(token))
             except ValueError:
                 hint = (
                     ": give the unit once, in unit, for the whole matrix"
@@ -135,7 +153,8 @@ def _parse_matrix(text: str) -> NDArray[np.float64]:
         rows.append(row)
     if not rows:
         raise ValueError("Type the rows of the matrix, such as 2, -1; -1, 2")
-    return np.array(rows, dtype=np.float64)
+    complex_ = any(isinstance(v, complex) for row in rows for v in row)
+    return np.array(rows, dtype=np.complex128 if complex_ else np.float64)
 
 
 def _unit_problem(unit: str) -> str | None:
@@ -287,14 +306,15 @@ def element(
     column: Annotated[int, Param(min=1, description="Numbered from 1; 1 for a vector")] = 1,
 ) -> Quantity:
     """One entry of a matrix or vector, with its unit. Rows and columns are
-    numbered from 1, so row 2 of a solution vector is x2."""
-    arr, unit = _split(matrix, "matrix")
+    numbered from 1, so row 2 of a solution vector is x2. An entry of a
+    complex matrix is complex."""
+    arr, unit = _split(matrix, "matrix", complex_ok=True)
     if arr.ndim == 1:
         arr = arr.reshape(-1, 1)
     rows, cols = arr.shape
     if not (1 <= row <= rows and 1 <= column <= cols):
         raise IndexError(f"No entry ({row}, {column}): the matrix is {rows}×{cols}")
-    return _join(float(arr[row - 1, column - 1]), unit)
+    return _join(arr[row - 1, column - 1].item(), unit)
 
 
 # --- solving ----------------------------------------------------------------------------------
@@ -405,15 +425,20 @@ def eigenvalues(
     (A v = λ B v). λ is in A's unit over B's. Column j of ``vectors`` belongs
     to value j, scaled to length 1.
 
-    Symmetric matrices (with B positive definite) have real eigenvalues and
-    are solved with the symmetric method; others may give complex pairs."""
+    Symmetric matrices (Hermitian, when complex; with B positive definite)
+    have real eigenvalues and are solved with the symmetric method; others may
+    give complex pairs."""
     import scipy.linalg
 
-    x, ua = _split(a, "A", square=True, vector_ok=False)
-    y, ub = (None, ureg().dimensionless) if b is None else _split(b, "B", square=True)
+    x, ua = _split(a, "A", square=True, vector_ok=False, complex_ok=True)
+    y, ub = (
+        (None, ureg().dimensionless) if b is None else _split(b, "B", square=True, complex_ok=True)
+    )
     if y is not None and y.shape != x.shape:
         raise ValueError(f"A is {_shape(x)} but B is {_shape(y)}: they must be the same size")
-    symmetric = bool(np.allclose(x, x.T) and (y is None or np.allclose(y, y.T)))
+    # the conjugate transpose: a complex symmetric matrix is not Hermitian, and eigh
+    # would read only one triangle of it
+    symmetric = bool(np.allclose(x, x.conj().T) and (y is None or np.allclose(y, y.conj().T)))
     if symmetric and (y is None or _positive_definite(y)):
         values, vectors = scipy.linalg.eigh(x, y)
         if y is not None:  # eigh scales to vᵀ B v = 1; here every vector has length 1

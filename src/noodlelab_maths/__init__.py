@@ -14,6 +14,7 @@ whichever module they are in.
 * :mod:`.calculus`: interpolation, integrals and derivatives
 * :mod:`.linalg`: matrices with units, linear systems, eigenvalues and natural frequencies
 * :mod:`.fourier`: Fourier transforms and power spectra, with units
+* :mod:`.complex_numbers`: the parts of complex numbers (real, imaginary, magnitude, phase)
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ require("maths", "matplotlib", "numpy", "pandas", "scipy")
 
 from .arrays import *  # noqa: E402, F403
 from .calculus import *  # noqa: E402, F403
+from .complex_numbers import *  # noqa: E402, F403
 from .fitting import *  # noqa: E402, F403
 from .fourier import *  # noqa: E402, F403
 from .linalg import *  # noqa: E402, F403
