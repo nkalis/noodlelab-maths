@@ -12,6 +12,8 @@ whichever module they are in.
 * :mod:`.plot`: XY plots, histograms and heatmaps
 * :mod:`.fitting`: descriptive statistics, regression, curve fitting, calibration
 * :mod:`.calculus`: interpolation, integrals and derivatives
+* :mod:`.linalg`: matrices with units, linear systems, eigenvalues and natural frequencies
+* :mod:`.fourier`: Fourier transforms and power spectra, with units
 """
 
 from __future__ import annotations
@@ -23,4 +25,6 @@ require("maths", "matplotlib", "numpy", "pandas", "scipy")
 from .arrays import *  # noqa: E402, F403
 from .calculus import *  # noqa: E402, F403
 from .fitting import *  # noqa: E402, F403
+from .fourier import *  # noqa: E402, F403
+from .linalg import *  # noqa: E402, F403
 from .plot import *  # noqa: E402, F403
