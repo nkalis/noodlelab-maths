@@ -70,11 +70,15 @@ class PolyFit(NamedTuple):
 def polynomial_fit(
     x: Numbers, y: Numbers, degree: Annotated[int, Param(min=0, max=12)] = 1
 ) -> PolyFit:
-    """Least-squares polynomial fit, highest power first."""
-    coeffs = np.polyfit(x, y, degree)
-    fitted = np.polyval(coeffs, x).astype(np.float64)
-    ss_res = float(np.sum((y - fitted) ** 2))
-    ss_tot = float(np.sum((y - np.mean(y)) ** 2))
+    """Least-squares polynomial fit, highest power first. Pairs with a NaN
+    are left out; ``fitted`` has a value for every x."""
+    xs, ys = _finite_pairs(x, y)
+    if len(xs) <= degree:
+        raise ValueError(f"A degree-{degree} fit needs more than {degree} points, got {len(xs)}")
+    coeffs = np.polyfit(xs, ys, degree)
+    fitted = np.polyval(coeffs, np.asarray(x, dtype=np.float64)).astype(np.float64)
+    ss_res = float(np.sum((ys - np.polyval(coeffs, xs)) ** 2))
+    ss_tot = float(np.sum((ys - np.mean(ys)) ** 2))
     return PolyFit(coeffs.astype(np.float64), fitted, 1.0 - ss_res / ss_tot if ss_tot else 1.0)
 
 
