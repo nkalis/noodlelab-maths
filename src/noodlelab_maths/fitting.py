@@ -487,6 +487,3 @@ def inverse_prediction(
 def _check_inverse(response: str = ""):
     if not response.strip():
         return "Choose the response column of the samples table"
-
-
-# --- comparing groups --------------------------------------------------------------------------
