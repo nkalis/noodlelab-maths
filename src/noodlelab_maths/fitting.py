@@ -23,7 +23,7 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from noodlelab import Param, Quantity, Uncertain, node, warning
-from noodlelab.core.uncertainty import correlated
+from noodlelab.core.uncertainty import correlated, real_only
 from noodlelab.core.units import is_quantity, ureg
 from noodlelab.reports.math import TypstMath
 
@@ -55,7 +55,7 @@ def statistics(x: Numbers, ddof: Annotated[int, Param(min=0, max=1)] = 1) -> Sta
 
     `ddof` = 1 gives the sample standard deviation, 0 the population one.
     """
-    values = np.asarray(x, dtype=np.float64)
+    values = np.asarray(real_only(x, "x"), dtype=np.float64)
     stats = (
         float(np.nanmean(values)),
         float(np.nanstd(values, ddof=ddof)),
@@ -98,8 +98,8 @@ def _check_polyfit(degree: int = 1):
 
 
 def _finite_pairs(x: Any, y: Any) -> tuple[np.ndarray, np.ndarray]:
-    x = np.asarray(x, dtype=np.float64)
-    y = np.asarray(y, dtype=np.float64)
+    x = np.asarray(real_only(x, "x"), dtype=np.float64)
+    y = np.asarray(real_only(y, "y"), dtype=np.float64)
     if x.shape != y.shape:
         raise ValueError(f"x and y differ in length ({x.size} and {y.size})")
     ok = np.isfinite(x) & np.isfinite(y)
