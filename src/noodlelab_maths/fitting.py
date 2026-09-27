@@ -343,10 +343,14 @@ def curve_fit(
     if len(p0) != len(m.params):
         raise ValueError(f"{model} takes {len(m.params)} starting values ({', '.join(m.params)})")
     weights = None
-    if sigma is not None:  # the same points _finite_pairs kept
-        weights = np.asarray(sigma, dtype=np.float64)[
-            np.isfinite(np.asarray(x, float)) & np.isfinite(np.asarray(y, float))
-        ]
+    if sigma is not None:
+        s = np.asarray(sigma, dtype=np.float64)
+        xa, ya = np.asarray(x, float), np.asarray(y, float)
+        if s.shape != xa.shape:  # indexing it by the pairs kept would fail, or misalign
+            raise ValueError(f"sigma has {s.size} values, but x and y have {xa.size}")
+        weights = s[np.isfinite(xa) & np.isfinite(ya)]  # the same points _finite_pairs kept
+        if not (np.isfinite(weights).all() and (weights > 0).all()):
+            raise ValueError("sigma must be a positive number for every point fitted")
     popt, pcov = optimize.curve_fit(
         m.fn, xs, ys, p0=p0, sigma=weights, absolute_sigma=weights is not None, maxfev=20_000
     )
