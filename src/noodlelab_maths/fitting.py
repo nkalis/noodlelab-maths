@@ -4,6 +4,13 @@ fitting and calibration (inverse prediction).
 The fitting nodes return their key numbers as separate outputs (to link into
 Format Values or later steps) and together as a ``summary`` dict with readable
 labels, ready for the report's Add Key Values node.
+
+Linear Regression and Curve Fit also give their parameters as uncertain values
+(``slope_q``, ``intercept_q``, ``estimates``) that carry the fit's covariance,
+so a result computed from several parameters of one fit has the right
+uncertainty (the parameters are correlated), and an uncertainty budget names
+each parameter. In a Monte Carlo evaluation they are drawn jointly from the
+normal distribution with that covariance.
 """
 
 from __future__ import annotations
@@ -15,7 +22,9 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from noodlelab import Param, node, warning
+from noodlelab import Param, Quantity, Uncertain, node, warning
+from noodlelab.core.uncertainty import correlated
+from noodlelab.core.units import is_quantity, ureg
 from noodlelab.reports.math import TypstMath
 
 from ._common import Confidence, Numbers, column, numeric
@@ -100,6 +109,19 @@ def _finite_pairs(x: Any, y: Any) -> tuple[np.ndarray, np.ndarray]:
 # --- linear regression -----------------------------------------------------------------------
 
 
+Column = Annotated[
+    Quantity | Numbers,
+    Param(description="Numbers, or a quantity holding them (a column with a unit)"),
+]
+
+
+def _magnitudes(values: Any) -> tuple[Any, Any]:
+    """The numbers of a column and its unit (None for plain numbers)."""
+    if is_quantity(values):
+        return np.asarray(values.magnitude, dtype=np.float64), values.units
+    return values, None
+
+
 class Regression(NamedTuple):
     slope: float
     intercept: float
@@ -112,17 +134,26 @@ class Regression(NamedTuple):
     fitted: NDArray[np.float64]
     residuals: NDArray[np.float64]
     summary: dict[str, Any]
+    slope_q: Uncertain
+    intercept_q: Uncertain
 
 
 @node(category="Math/Fitting", title="Linear Regression", sample=False)
 def linear_regression(
-    x: Numbers, y: Numbers, through_origin: bool = False, confidence: Confidence = 0.95
+    x: Column, y: Column, through_origin: bool = False, confidence: Confidence = 0.95
 ) -> Regression:
     """Ordinary least squares y = slope·x + intercept, with standard errors,
     R², the p-value of the slope and the residual standard deviation. Pairs
-    with a NaN are left out. ``through_origin`` fixes the intercept at zero."""
+    with a NaN are left out. ``through_origin`` fixes the intercept at zero.
+
+    ``slope_q`` and ``intercept_q`` are the slope and intercept as uncertain
+    values, correlated as the fit makes them, in the units of y/x and y when
+    the columns have units: ``slope_q · x + intercept_q`` has the standard
+    error of the line at x."""
     from scipy import stats as st
 
+    x, x_unit = _magnitudes(x)
+    y, y_unit = _magnitudes(y)
     xs, ys = _finite_pairs(x, y)
     n = len(xs)
     k = 1 if through_origin else 2
@@ -146,6 +177,18 @@ def linear_regression(
         slope_se = s / np.sqrt(sxx)
         intercept_se = s * float(np.sqrt(1 / n + xs.mean() ** 2 / sxx))
         ss_tot = float(np.sum((ys - ys.mean()) ** 2))
+    # cov(slope, intercept) = -x̄·s²/Sxx: a steeper line crosses x = 0 lower
+    covariance = -float(xs.mean()) * s**2 / sxx if not through_origin else 0.0
+    slope_q, intercept_q = correlated(
+        [slope, intercept],
+        [[slope_se**2, covariance], [covariance, intercept_se**2]],
+        ["slope", "intercept"],
+    )
+    if x_unit is not None or y_unit is not None:
+        reg = ureg()
+        yu = y_unit if y_unit is not None else reg.dimensionless
+        xu = x_unit if x_unit is not None else reg.dimensionless
+        slope_q, intercept_q = reg.Quantity(slope_q, yu / xu), reg.Quantity(intercept_q, yu)
     r2 = 1.0 - float(np.sum(res**2)) / ss_tot if ss_tot else 1.0
     t = slope / slope_se if slope_se else np.inf
     p = float(2 * st.t.sf(abs(t), dof))
@@ -177,6 +220,8 @@ def linear_regression(
         fitted_all.astype(np.float64),
         (np.asarray(y, dtype=np.float64) - fitted_all).astype(np.float64),
         summary,
+        slope_q,
+        intercept_q,
     )
 
 
@@ -308,6 +353,7 @@ class CurveFit(NamedTuple):
     curve_y: NDArray[np.float64]
     equation: str
     summary: dict[str, Any]
+    estimates: dict[str, Uncertain]
 
 
 @node(category="Math/Fitting", title="Curve Fit", sample=False)
@@ -328,6 +374,10 @@ def curve_fit(
     the fitted values and residuals at x, R² and RMSE, a smooth curve over the
     data's range for plotting, and the model's equation in Typst math for the
     report. ``sigma``: measurement uncertainties of y, used as weights.
+
+    ``estimates`` has each parameter as an uncertain value, by name, correlated
+    as the fit's covariance says (empty when the fit leaves a parameter
+    undetermined, with an infinite standard error).
     """
     from scipy import optimize
     from scipy import stats as st
@@ -355,6 +405,10 @@ def curve_fit(
         m.fn, xs, ys, p0=p0, sigma=weights, absolute_sigma=weights is not None, maxfev=20_000
     )
     perr = np.sqrt(np.clip(np.diag(pcov), 0, None))
+    try:
+        estimates = dict(zip(m.params, correlated(popt, pcov, m.params), strict=True))
+    except ValueError:  # an undetermined parameter (infinite covariance)
+        estimates = {}
     dof = max(1, len(xs) - len(popt))
     tq = float(st.t.ppf(0.5 + confidence / 2, dof))
     pct = f"{confidence:.0%}"
@@ -396,6 +450,7 @@ def curve_fit(
         np.asarray(m.fn(cx, *popt), dtype=np.float64),
         TypstMath(m.equation),
         summary,
+        estimates,
     )
 
 
