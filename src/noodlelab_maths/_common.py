@@ -11,6 +11,7 @@ from matplotlib.figure import Figure
 from numpy.typing import NDArray
 
 from noodlelab import FileRef, Param
+from noodlelab.core.uncertainty import real_only
 
 CsvFile = Annotated[FileRef, Param(accept=(".csv", ".tsv", ".txt"))]
 
@@ -51,9 +52,10 @@ def numeric(table: pd.DataFrame, col: str) -> NDArray[np.float64]:
     """A column as float64, with a clear error for text columns."""
     require_columns(table, col)
     try:
-        return pd.to_numeric(table[col], errors="raise").to_numpy(dtype=np.float64)
+        values = pd.to_numeric(table[col], errors="raise")
     except (TypeError, ValueError):
         raise TypeError(f"Column '{col}' is not numeric") from None
+    return real_only(values, f"Column '{col}'").to_numpy(dtype=np.float64)
 
 
 def as_years(values: Any) -> NDArray[np.float64]:
@@ -64,7 +66,7 @@ def as_years(values: Any) -> NDArray[np.float64]:
         start = pd.to_datetime(t.year.astype(str) + "-01-01")
         days = np.where(t.is_leap_year, 366.0, 365.0)
         return (t.year + (t - start).total_seconds() / 86400.0 / days).to_numpy(np.float64)
-    return pd.to_numeric(s).to_numpy(np.float64)
+    return real_only(pd.to_numeric(s), "The values").to_numpy(np.float64)
 
 
 def finish(ax: Axes, title: str, x_label: str, y_label: str) -> None:

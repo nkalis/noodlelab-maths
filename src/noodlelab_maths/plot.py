@@ -16,6 +16,7 @@ from matplotlib.figure import Figure
 
 from noodlelab import Param, RunContext, node
 from noodlelab.core import figures
+from noodlelab.core.uncertainty import real_only
 
 from ._common import Colormap, Numbers, axes, finish
 
@@ -47,6 +48,9 @@ def xy_plot(
     ] = "line",
 ) -> Figure:
     """Plot y (and optionally y2, e.g. a fitted curve or marked peaks) against x."""
+    # Matplotlib would draw only the real part of a complex array
+    for name, v in (("x", x), ("y", y), ("y2", y2), ("x2", x2), ("error", error)):
+        real_only(v, name)
     fig, ax = axes()
     if error is not None:
         ax.errorbar(x, y, yerr=error, fmt="none", ecolor="0.5", elinewidth=1, capsize=2)
@@ -80,7 +84,7 @@ def histogram_plot(
 ) -> Figure:
     """Distribution of values, optionally with the normal curve of the same
     mean and standard deviation for comparison."""
-    v = np.asarray(x, dtype=np.float64)
+    v = np.asarray(real_only(x, "x"), dtype=np.float64)
     v = v[np.isfinite(v)]
     fig, ax = axes()
     ax.hist(v, bins=bins, color="#4c72b0", alpha=0.8, edgecolor="white", linewidth=0.5)
