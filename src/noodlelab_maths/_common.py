@@ -11,11 +11,15 @@ from matplotlib.figure import Figure
 from numpy.typing import NDArray
 
 from noodlelab import FileRef, Param
+from noodlelab.core.uncertainty import AS_IS
 
 CsvFile = Annotated[FileRef, Param(accept=(".csv", ".tsv", ".txt"))]
 
 Floats = NDArray[np.floating]
 Numbers = NDArray[np.number]
+# numbers that may carry an uncertainty the node reads itself (error bars, say)
+# instead of having it propagated for it: see noodlelab.core.uncertainty.AS_IS
+UncertainArray = Annotated[NDArray[np.number], AS_IS]
 Confidence = Annotated[float, Param(min=0.5, max=0.999, step=0.01, precision=3)]
 Colormap = Literal["viridis", "plasma", "cividis", "magma", "coolwarm", "RdBu_r", "YlOrRd", "Blues"]
 

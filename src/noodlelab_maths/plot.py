@@ -15,9 +15,9 @@ import pandas as pd
 from matplotlib.figure import Figure
 
 from noodlelab import Param, RunContext, node
-from noodlelab.core import figures
+from noodlelab.core import figures, uncertainty
 
-from ._common import Colormap, Numbers, axes, finish
+from ._common import Colormap, Numbers, UncertainArray, axes, finish
 
 __all__ = [
     "heatmap",
@@ -30,7 +30,7 @@ __all__ = [
 @node(category="Math/Plot", title="XY Plot")
 def xy_plot(
     x: Numbers,
-    y: Numbers,
+    y: UncertainArray,
     y2: Numbers | None = None,
     x2: Annotated[Numbers | None, Param(description="x for y2, if it differs from x")] = None,
     error: Annotated[Numbers | None, Param(description="Error bars for y")] = None,
@@ -46,7 +46,11 @@ def xy_plot(
         Literal["line", "markers"], Param(description="markers: e.g. to mark peaks on y")
     ] = "line",
 ) -> Figure:
-    """Plot y (and optionally y2, e.g. a fitted curve or marked peaks) against x."""
+    """Plot y (and optionally y2, e.g. a fitted curve or marked peaks) against x.
+    A y with uncertainties gets error bars of ±u unless ``error`` is linked."""
+    y, u = uncertainty.split(y)
+    if error is None:
+        error = u
     fig, ax = axes()
     if error is not None:
         ax.errorbar(x, y, yerr=error, fmt="none", ecolor="0.5", elinewidth=1, capsize=2)
