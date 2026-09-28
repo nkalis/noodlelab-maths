@@ -11,7 +11,7 @@ from matplotlib.figure import Figure
 from numpy.typing import NDArray
 
 from noodlelab import FileRef, Param
-from noodlelab.core.uncertainty import AS_IS, real_only
+from noodlelab.plugin.uncertainty import AS_IS, real_only
 
 CsvFile = Annotated[FileRef, Param(accept=(".csv", ".tsv", ".txt"))]
 

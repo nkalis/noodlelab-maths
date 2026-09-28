@@ -29,8 +29,8 @@ from matplotlib.figure import Figure
 from numpy.typing import NDArray
 
 from noodlelab import Param, Quantity, node, warning
-from noodlelab.core import uncertainty
-from noodlelab.core.units import dims_or_none, is_quantity, ureg
+from noodlelab.plugin import uncertainty
+from noodlelab.plugin.units import dims_or_none, is_quantity, ureg
 
 __all__ = [
     "determinant",
@@ -59,7 +59,7 @@ RadPerSecond = Quantity["rad/s"]
 # --- helpers ----------------------------------------------------------------------------------
 
 
-def _split(
+def split_matrix(
     value: Any,
     name: str,
     *,
@@ -219,7 +219,7 @@ def diagonal_matrix(
     """A matrix with ``diagonal`` on its diagonal and zeros elsewhere, such as
     the mass matrix of masses on springs. A linked vector replaces the text."""
     if values is not None:
-        arr, u = _split(values, "values")
+        arr, u = split_matrix(values, "values")
         return _join(np.diag(arr.ravel()), u)
     return _join(np.diag(_parse_matrix(diagonal).ravel()), _in(unit))
 
@@ -240,7 +240,7 @@ def _check_diagonal(diagonal: str = "", unit: str = "", values: Any = None) -> s
 @node(category="Math/Matrices", title="Transpose", sample=False)
 def transpose(matrix: Matrix) -> Quantity:
     """Rows become columns. A vector (a column) becomes a row, 1×n."""
-    arr, unit = _split(matrix, "matrix")
+    arr, unit = split_matrix(matrix, "matrix")
     return _join(arr.reshape(-1, 1).T if arr.ndim == 1 else arr.T, unit)
 
 
@@ -249,8 +249,8 @@ def matrix_multiply(a: Matrix, b: Matrix) -> Quantity:
     """The matrix product A B, with the units multiplied too: a stiffness
     matrix times a displacement vector is a force vector. A vector counts as a
     column. For element-by-element products use Quantity Math."""
-    x, ux = _split(a, "a")
-    y, uy = _split(b, "b")
+    x, ux = split_matrix(a, "a")
+    y, uy = split_matrix(b, "b")
     if x.ndim == 1:
         x = x.reshape(1, -1)
     inner = y.shape[0]
@@ -270,7 +270,7 @@ def inverse(matrix: Matrix) -> Quantity:
     """The inverse A⁻¹, in the reciprocal unit: the inverse of a stiffness
     matrix (N/m) is a flexibility matrix (m/N). To solve A x = b, Solve Linear
     System is more accurate than multiplying by the inverse."""
-    arr, unit = _split(matrix, "matrix", square=True, vector_ok=False)
+    arr, unit = split_matrix(matrix, "matrix", square=True, vector_ok=False)
     rank = _rank(arr)
     if rank < arr.shape[0]:
         raise ValueError(f"The matrix is singular (rank {rank} of {arr.shape[0]}): no inverse")
@@ -282,7 +282,7 @@ def _check_inverse(matrix: Any = None) -> Any:
     if matrix is None:
         return None
     try:
-        arr, _ = _split(matrix, "matrix", square=True, vector_ok=False)
+        arr, _ = split_matrix(matrix, "matrix", square=True, vector_ok=False)
     except (TypeError, ValueError) as exc:
         return str(exc)
     cond = np.linalg.cond(arr)
@@ -295,7 +295,7 @@ def _check_inverse(matrix: Any = None) -> Any:
 def determinant(matrix: Matrix) -> Quantity:
     """The determinant, in the matrix's unit to the power of its size. Zero
     means the matrix is singular: its equations are not independent."""
-    arr, unit = _split(matrix, "matrix", square=True, vector_ok=False)
+    arr, unit = split_matrix(matrix, "matrix", square=True, vector_ok=False)
     return _join(float(np.linalg.det(arr)), unit ** arr.shape[0])
 
 
@@ -308,7 +308,7 @@ def element(
     """One entry of a matrix or vector, with its unit. Rows and columns are
     numbered from 1, so row 2 of a solution vector is x2. An entry of a
     complex matrix is complex."""
-    arr, unit = _split(matrix, "matrix", complex_ok=True)
+    arr, unit = split_matrix(matrix, "matrix", complex_ok=True)
     if arr.ndim == 1:
         arr = arr.reshape(-1, 1)
     rows, cols = arr.shape
@@ -343,8 +343,8 @@ def solve_linear(
     fits (``method`` says which). ``residual`` is b − A x, and ``condition``
     how much errors in A and b can be amplified: above about 1e12 the answer
     means little."""
-    x_a, ua = _split(a, "A")
-    x_b, ub = _split(b, "b")
+    x_a, ua = split_matrix(a, "A")
+    x_b, ub = split_matrix(b, "b")
     if x_a.ndim == 1:
         x_a = x_a.reshape(-1, 1)
     rows, cols = x_a.shape
@@ -384,7 +384,7 @@ def _check_solve_linear(a: Any = None, unit: str = "") -> Any:
     if a is None:
         return None
     try:
-        arr, _ = _split(a, "A")
+        arr, _ = split_matrix(a, "A")
     except (TypeError, ValueError) as exc:
         return str(exc)
     cond = np.linalg.cond(arr.reshape(-1, 1) if arr.ndim == 1 else arr)
@@ -430,9 +430,11 @@ def eigenvalues(
     give complex pairs."""
     import scipy.linalg
 
-    x, ua = _split(a, "A", square=True, vector_ok=False, complex_ok=True)
+    x, ua = split_matrix(a, "A", square=True, vector_ok=False, complex_ok=True)
     y, ub = (
-        (None, ureg().dimensionless) if b is None else _split(b, "B", square=True, complex_ok=True)
+        (None, ureg().dimensionless)
+        if b is None
+        else split_matrix(b, "B", square=True, complex_ok=True)
     )
     if y is not None and y.shape != x.shape:
         raise ValueError(f"A is {_shape(x)} but B is {_shape(y)}: they must be the same size")
@@ -516,8 +518,8 @@ def natural_frequencies(
     gives NaN."""
     import scipy.linalg
 
-    k, ku = _split(stiffness, "stiffness", square=True, vector_ok=False)
-    m, mu = _split(mass, "mass", square=True)
+    k, ku = split_matrix(stiffness, "stiffness", square=True, vector_ok=False)
+    m, mu = split_matrix(mass, "mass", square=True)
     if m.ndim == 1:
         m = np.diag(m)
     if m.shape != k.shape:
@@ -562,8 +564,8 @@ def _check_natural_frequencies(stiffness: Any = None, mass: Any = None) -> Any:
     if stiffness is None or mass is None:
         return None
     try:
-        _, ku = _split(stiffness, "stiffness")
-        _, mu = _split(mass, "mass")
+        _, ku = split_matrix(stiffness, "stiffness")
+        _, mu = split_matrix(mass, "mass")
         _per_second_squared(ku, mu)
     except (TypeError, ValueError) as exc:
         return str(exc)

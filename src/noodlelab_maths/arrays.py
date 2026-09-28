@@ -9,7 +9,7 @@ from numpy.typing import NDArray
 
 from noodlelab import Param, node, warning
 
-from ._common import Floats, Numbers
+from .common import Floats, Numbers
 
 __all__ = [
     "add_noise",

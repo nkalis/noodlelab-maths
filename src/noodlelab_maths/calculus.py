@@ -9,7 +9,7 @@ from numpy.typing import NDArray
 
 from noodlelab import node
 
-from ._common import Floats, Numbers
+from .common import Floats, Numbers
 
 __all__ = [
     "derivative",

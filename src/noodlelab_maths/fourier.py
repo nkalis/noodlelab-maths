@@ -23,7 +23,7 @@ from matplotlib.figure import Figure
 from numpy.typing import NDArray
 
 from noodlelab import Param, Quantity, node
-from noodlelab.core.units import is_quantity, ureg
+from noodlelab.plugin.units import is_quantity, ureg
 
 __all__ = ["fourier_transform", "inverse_fourier_transform", "power_spectrum"]
 

@@ -15,10 +15,10 @@ import pandas as pd
 from matplotlib.figure import Figure
 
 from noodlelab import Param, RunContext, node
-from noodlelab.core import figures, uncertainty
-from noodlelab.core.uncertainty import real_only
+from noodlelab.plugin import figures, uncertainty
+from noodlelab.plugin.uncertainty import real_only
 
-from ._common import Colormap, Numbers, UncertainArray, axes, finish
+from .common import Colormap, Numbers, UncertainArray, axes, finish
 
 __all__ = [
     "heatmap",

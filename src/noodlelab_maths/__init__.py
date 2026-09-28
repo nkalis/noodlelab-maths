@@ -19,7 +19,7 @@ whichever module they are in.
 
 from __future__ import annotations
 
-from noodlelab.tiers import require
+from noodlelab.plugin import require
 
 require("maths", "matplotlib", "numpy", "pandas", "scipy")
 

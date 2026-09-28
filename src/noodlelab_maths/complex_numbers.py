@@ -16,7 +16,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from noodlelab import Param, Quantity, node
-from noodlelab.core.units import is_quantity, ureg
+from noodlelab.plugin.units import is_quantity, ureg
 
 __all__ = ["complex_parts"]
 

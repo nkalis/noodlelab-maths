@@ -23,11 +23,11 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from noodlelab import Param, Quantity, Uncertain, node, warning
-from noodlelab.core.uncertainty import correlated, real_only
-from noodlelab.core.units import is_quantity, ureg
-from noodlelab.reports.math import TypstMath
+from noodlelab.plugin.math import TypstMath
+from noodlelab.plugin.uncertainty import correlated, real_only
+from noodlelab.plugin.units import is_quantity, ureg
 
-from ._common import Confidence, Numbers, column, numeric
+from .common import Confidence, Numbers, column, numeric
 
 __all__ = [
     "curve_fit",
