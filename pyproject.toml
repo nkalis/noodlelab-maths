@@ -1,0 +1,30 @@
+[project]
+name = "noodlelab-maths"
+# its own version: plugins are versioned as a whole (see docs/plugins/writing.md)
+version = "1.0.0"
+description = "Maths: arrays, plots, curve fitting, calculus, linear algebra and Fourier transforms"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "Nicolas Kalis" }]
+dependencies = [
+    "noodlelab>=0.2.2.dev0,<1",
+    "numpy>=1.26",
+    "pandas>=3.0",
+    "matplotlib>=3.8",
+    "scipy>=1.12",
+]
+
+[project.urls]
+Homepage = "https://nkalis.github.io/noodlelab/"
+
+# how noodlelab finds it; the name is the prefix of its node ids (maths.<node>)
+[project.entry-points."noodlelab.nodes"]
+maths = "noodlelab_maths"
+
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/noodlelab_maths"]
