@@ -2,5 +2,5 @@ name = "maths"
 title = "Maths"
 description = "Arrays, plots, curve fitting, calculus, linear algebra and Fourier transforms"
 api = 1
-homepage = "https://github.com/nkalis/noodlelab"
+homepage = "https://github.com/nkalis/noodlelab-maths"
 license = "MIT"
